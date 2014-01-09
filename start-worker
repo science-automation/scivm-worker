@@ -1,4 +1,4 @@
 #!/bin/bash
 
 # start the worker
-SERVER_ADDRESS=127.0.0.1 SERVER_PORT=4444 python cloud_server/concept2/worker/job_task.py
+SERVER_ADDRESS=127.0.0.1 SERVER_PORT=4444 python job_task.py
