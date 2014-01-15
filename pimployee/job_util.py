@@ -95,7 +95,7 @@ def process_job(m, c):
         args = deserialize(args) if args else ()
         kwargs = deserialize(kwargs) if kwargs else {}
     except:
-        log.pilogger.exception('Could not depickle job')
+        #FIXME # commented this out # log.pilogger.exception('Could not depickle job')
         tb = traceback.format_exc()[:traceback_max_length]
         
         c.send({'type': 'finished',
@@ -104,7 +104,7 @@ def process_job(m, c):
                tb)
         
         # raise an exception to signal that the process should be killed
-        raise EndProcessException('Could not depickle. Signal to kill process.')
+        return #FIXME # commented this out # raise EndProcessException('Could not depickle. Signal to kill process.')
     
     # catch SIGTERM (kill commands) and simply raise an exception
     # so that we get access to the traceback
