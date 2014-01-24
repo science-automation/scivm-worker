@@ -34,7 +34,7 @@ s = setup_util.connect_to_boss()
 c = UnixDomainSocketClient(s)
 
 c.send({
-    "type": "info",
+    "type": "registration",
     "qdesc": qdesc
 })
 
