@@ -19,6 +19,11 @@ import sys
 from pimployee import log, setup_util, job_util
 from pimployee.switchboard_client import UnixDomainSocketClient
 
+try:
+    qdesc = os.environ["QDESC"]
+except KeyError:
+    raise Exception('environment variable QDESC is not set')
+
 setup_util.socket_set_default_timeout(60.0)
 
 # creates a connection to the boss using a unix domain socket
@@ -27,6 +32,11 @@ s = setup_util.connect_to_boss()
 
 # create client object for easy sending and receiving of messages
 c = UnixDomainSocketClient(s)
+
+c.send({
+    "type": "info",
+    "qdesc": qdesc
+})
 
 m = c.read()
 if m.meta['type'] != 'setup':
