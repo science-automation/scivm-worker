@@ -1,6 +1,73 @@
 import json
 import passfd
 import threading
+import Queue
+
+class Sender(threading.Thread):
+    
+    def __init__(self, socket, sq, rq):
+        super(Sender, self).__init__()
+        self._sq = sq
+        self._rq = rq
+        self._socket = socket
+
+    def run(self):
+        while True:
+            to_send = self._sq.get()
+            if to_send is None:
+                break
+            try:
+                self._socket.sendall(to_send)
+            except IOError, e:
+                m = Message()
+                m.meta = {"type": 'die'}
+                m.ready.set()
+                self._rq.put_nowait(m)
+                self._socket.close()
+                break
+        """
+            to_send = None
+            try:
+                to_send = self._sq.get(timeout=10)
+            except Queue.Empty:
+                pass         
+            
+            try:
+                if to_send is None:
+                    self._socket.sendall(Message.serialize_message({"type": "hb"}))
+                else:
+                    self._socket.sendall(to_send)
+            except BaseException, e:
+                self._rq.put_nowait(e)
+                break
+        """
+
+class Receiver(threading.Thread):
+    
+    def __init__(self, socket, rq, sq):
+        super(Receiver, self).__init__()
+        self._rq = rq
+        self._sq = sq
+        self._socket = socket
+
+    def run(self):
+        message = Message()
+        while True:
+            try:
+                message.read(self._socket)
+            except IOError, e:
+                m = Message()
+                m.meta = {"type": 'die'}
+                m.ready.set()
+                self._rq.put_nowait(m)
+                break
+            if message.is_ready():
+                if message.meta["type"] == "hb":
+                    print "hb"
+                    self._sq.put_nowait(Message.serialize_message({"type": "hb"}))
+                else:
+                    self._rq.put(message)
+                message = Message()
 
 class Message(object):
     """Represents the unit by which we send messages between our socket
@@ -8,7 +75,6 @@ class Message(object):
     
     STATE_META = 'META'
     STATE_PAYLOAD = 'PAYLOAD'
-    STATE_FD = 'FD'
     STATE_READY = 'READY'
     META_LENGTH = 1024
     
@@ -26,15 +92,16 @@ class Message(object):
         
         if self.state == self.STATE_META:
             #print 'receiving meta'
-            self.meta += socket.recv(self.META_LENGTH - len(self.meta))
+            chunk = socket.recv(self.META_LENGTH - len(self.meta))
+            if chunk == "":
+                raise IOError("Connection lost")
+            self.meta += chunk
             if len(self.meta) == self.META_LENGTH:
                 #print 'meta before deserialization', self.meta
                 self.meta = json.loads(self.meta)
                 if self.meta.get('payload_length'):
                     self.state = self.STATE_PAYLOAD
                     #print 'changed state to payload'
-                elif self.meta.get('has_fd'):
-                    self.state = self.STATE_FD
                 else:
                     self.state = self.STATE_READY
                     #print 'changed state to ready'
@@ -45,19 +112,8 @@ class Message(object):
             self.payload += socket.recv(self.meta.get('payload_length') - len(self.payload))
             #print 'length of payload so far', len(self.payload)
             if len(self.payload) == self.meta.get('payload_length'):
-                if self.meta.get('has_fd'):
-                    self.state = self.STATE_FD
-                else:
-                    self.state = self.STATE_READY
-                    self.ready.set()
-    
-        if self.state == self.STATE_FD:
-            # assume this always succeeds
-            fileno, _ = passfd.recvfd(socket, 1)
-            self.meta['fileno'] = fileno
-            #print 'GOT A FILENO!!!', fileno
-            self.state = self.STATE_READY
-            self.ready.set()
+                self.state = self.STATE_READY
+                self.ready.set()
     
     def is_ready(self):
         return self.ready.is_set()
@@ -74,8 +130,7 @@ class Message(object):
         
         if payload:
             meta['payload_length'] = len(payload)
-        if has_fd:
-            meta['has_fd'] = True
+        
         data = json.dumps(meta)
         
         if len(data) > Message.META_LENGTH:
@@ -85,8 +140,6 @@ class Message(object):
         if payload:
             data += payload
             del meta['payload_length']
-        if has_fd:
-            del meta['has_fd']
         
         #print 'sending the data of length', len(data)
         return data
@@ -95,31 +148,30 @@ class Message(object):
 class UnixDomainSocketClient(object):
     
     def __init__(self, socket):
-        
-        self.socket = socket
-        self.current_message = Message()
-        
-    #def switchboard_registration_information(self):
-    #    return {'fileno': self.socket.fileno(), 'callback': None, 'eventmask': EPOLLIN | EPOLLPRI | EPOLLET}
-    #    
-    def read(self, blocking=True):
-        
-        while True:
-            self.current_message.read(self.socket)
-            if self.current_message.is_ready():
-                message = self.current_message
-                self.current_message = Message()
-                return message
-            elif not blocking:
-                return
-                
+        self._socket = socket
+
+        self._sq = Queue.Queue() 
+        self._rq = Queue.Queue() 
+        self._sender = Sender(socket, self._sq, self._rq)
+        self._receiver = Receiver(socket, self._rq, self._sq)
+        self._sender.daemon = True
+        self._receiver.daemon = True
+        self._sender.start()
+        self._receiver.start()
+    
+    def kill(self):
+        self._socket.close()
+
+    def read(self):
+        message = self._rq.get()
+        if isinstance(message, BaseException):
+            raise message
+        return message
+
     def send(self, meta, payload=None, fileno=None):
         """
         *meta* dict
         *payload* bytes
         *fileno* file descriptor
         """
-        #print 'sending', Message.serialize_message(meta, payload, has_fd=fileno != None)
-        self.socket.sendall(Message.serialize_message(meta, payload, has_fd=fileno != None))
-        if fileno:
-            passfd.sendfd(self.socket, fileno, '*')
+        self._sq.put_nowait(Message.serialize_message(meta, payload, has_fd=fileno != None))

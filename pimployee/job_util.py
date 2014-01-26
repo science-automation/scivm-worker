@@ -172,10 +172,10 @@ def process_job(m, c):
         log.logger.info('Closed cloud and cloud.mp. Open check (cloud=%s, cloud.mp=%s)' % (cloud_open, cloud_mp_open))
         
         if not end_process:
-            running_threads = threading.enumerate()[1:]
+            running_threads = [ th for th in threading.enumerate()[1:] if th not in (c._sender, c._receiver) ]
             if running_threads:
                 time.sleep(0.02) #give some time for threads that may be shutting down
-                running_threads = threading.enumerate()[1:]
+                running_threads = [ th for th in threading.enumerate()[1:] if th not in (c._sender, c._receiver) ]
             
                 if running_threads:
                     end_process = True

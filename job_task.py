@@ -96,7 +96,7 @@ while True:
         os.dup2(orig_stderr_fd, sys.stderr.fileno())
         
         break
-
+c.kill()
 # an interpreter shutdown sometimes crashes. we don't want faulthandler
 # to deal with it
 setup_util.disable_faulthandler()
