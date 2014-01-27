@@ -63,7 +63,6 @@ class Receiver(threading.Thread):
                 break
             if message.is_ready():
                 if message.meta["type"] == "hb":
-                    print "hb"
                     self._sq.put_nowait(Message.serialize_message({"type": "hb"}))
                 else:
                     self._rq.put(message)
