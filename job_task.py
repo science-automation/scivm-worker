@@ -21,8 +21,9 @@ from pimployee.switchboard_client import UnixDomainSocketClient
 
 try:
     qdesc = os.environ["QDESC"]
+    wid = os.environ["WID"]
 except KeyError:
-    raise Exception('environment variable QDESC is not set')
+    raise Exception('environment variable QDESC and/or WID are not set')
 
 setup_util.socket_set_default_timeout(60.0)
 
@@ -35,7 +36,8 @@ c = UnixDomainSocketClient(s)
 
 c.send({
     "type": "registration",
-    "qdesc": qdesc
+    "qdesc": qdesc,
+    "wid": wid,
 })
 
 m = c.read()
