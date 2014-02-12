@@ -1,10 +1,11 @@
 #!/bin/bash
 
-# Find the job server ip address and port
-(cat /proc/1/environ; echo) | tr '\000' '\n' |grep JOBSERVER > /tmp/jinfo.dat
+(cat /proc/1/environ; echo) | tr '\000' '\n' |grep GATEWAY > /tmp/jinfo.dat
+(cat /proc/1/environ; echo) | tr '\000' '\n' |grep WID >> /tmp/jinfo.dat
+(cat /proc/1/environ; echo) | tr '\000' '\n' |grep QDESC >> /tmp/jinfo.dat
+
 source /tmp/jinfo.dat
 
 # start the worker
 cd /opt/apps/scivm/scivm-worker
-SERVER_ADDRESS=$JOBSERVER_HOST SERVER_PORT=$JOBSERVER_PORT python job_task.py
-
+GATEWAY=$GATEWAY WID=$WID QDESC=$QDESC python job_task.py 
