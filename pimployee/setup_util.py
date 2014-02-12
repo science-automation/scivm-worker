@@ -74,7 +74,7 @@ def setup_logging(m):
 
 def setup_cloud(hostname, ap_version):
 
-    import cloud
+    import scicloud as cloud
 
     cloud.config._showhidden()
     cloud.config.hostname = hostname
