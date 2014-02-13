@@ -20,7 +20,7 @@ from pimployee import log, setup_util, job_util
 from pimployee.switchboard_client import UnixDomainSocketClient
 
 try:
-    qdesc = os.environ["QDESC"]
+    qid = os.environ["QID"]
     wid = os.environ["WID"]
     address, port = os.environ["GATEWAY"].split(":")
     port = int(port)
@@ -38,7 +38,7 @@ c = UnixDomainSocketClient(s)
 
 c.send({
     "type": "registration",
-    "qdesc": qdesc,
+    "qid": qid,
     "wid": wid,
 })
 
